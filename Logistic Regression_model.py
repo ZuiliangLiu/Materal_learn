@@ -5,11 +5,30 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
 import plotly.express as px
+import joblib
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder, OneHotEncoder
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
+
+def predict_and_plot(inputs, targets, name=''):
+    preds = model.predict(inputs)
+
+    accuracy = accuracy_score(targets, preds)
+    print("Accuracy: {:.2f}%".format(accuracy * 100))
+
+    cf = confusion_matrix(targets, preds, normalize='true')
+    plt.figure()
+    sns.heatmap(cf, annot=True)
+    plt.xlabel('Prediction')
+    plt.ylabel('Target')
+    plt.title('{} Confusion Matrix'.format(name))
+
+    return preds
+
+
 
 
 raw_df = pd.read_csv("weatherAUS.csv")
@@ -151,13 +170,89 @@ val_pred = model.predict(X_val)
 test_pred = model.predict(X_test)
 
 train_probs = model.predict_proba(X_train)
-print(train_probs)
-print(model.classes_)
+# print(train_probs)
+# print(model.classes_)
+#
+# print(accuracy_score(train_targets, train_pred))
+# print(accuracy_score(val_targets, val_pred))
+# print(accuracy_score(test_targets, test_pred))
 
-print(accuracy_score(train_targets, train_pred))
-print(accuracy_score(val_targets, val_pred))
-print(accuracy_score(test_targets, test_pred))
+cm = confusion_matrix(train_targets, train_pred, normalize="true")
+# print(cm)
 
+# train_pred = predict_and_plot(X_train, train_targets, "Training")
+# plt.show()
+#
+# val_pred = predict_and_plot(X_val, val_targets, "Validation")
+# plt.show()
+#
+# test_pred = predict_and_plot(X_test, test_targets, "Testing")
+# plt.show()
 
+new_input = {
+    'Date': '2021-06-19',
+    'Location': 'Katherine',
+    'MinTemp': 23.2,
+    'MaxTemp': 33.2,
+    'Rainfall': 10.2,
+    'Evaporation': 4.2,
+    'Sunshine': np.nan,
+    'WindGustDir': 'NNW',
+    'WindGustSpeed': 52.0,
+    'WindDir9am': 'NW',
+    'WindDir3pm': 'NNE',
+    'WindSpeed9am': 13.0,
+    'WindSpeed3pm': 20.0,
+    'Humidity9am': 89.0,
+    'Humidity3pm': 58.0,
+    'Pressure9am': 1004.8,
+    'Pressure3pm': 1001.5,
+    'Cloud9am': 8.0,
+    'Cloud3pm': 5.0,
+    'Temp9am': 25.7,
+    'Temp3pm': 33.0,
+    'RainToday': 'Yes'
+}#创建新的输入
+new_input_df = pd.DataFrame([new_input])
 
+new_input_df[numeric_cols] = imputer.transform(new_input_df[numeric_cols])
+new_input_df[numeric_cols] = scaler.transform(new_input_df[numeric_cols])
+new_input_df[encoded_cols] = encoder.transform(new_input_df[categorical_cols])
+X_new_input = new_input_df[numeric_cols + encoded_cols]
+
+# print(model.predict(X_new_input))
+# print(model.predict_proba(X_new_input))
+
+aussie_rain = {
+    'model': model,
+    'imputer': imputer,
+    'scaler': scaler,
+    'encoder': encoder,
+    'input_cols': input_cols,
+    'target_col': target_col,
+    'numeric_cols': numeric_cols,
+    'categorical_cols': categorical_cols,
+    'encoded_cols': encoded_cols
+}
+joblib.dump(aussie_rain, 'aussie_rain.joblib')
+
+aussie_rain2 = joblib.load('aussie_rain.joblib')
+
+# print(aussie_rain2["model"].coef_)
+
+def predict_input(single_input):
+    input_df = pd.DataFrame([single_input])
+
+    input_df[numeric_cols] = imputer.transform(input_df[numeric_cols])
+    input_df[numeric_cols] = scaler.transform(input_df[numeric_cols])
+    input_df[encoded_cols] = encoder.transform(input_df[categorical_cols])
+
+    X_input = input_df[numeric_cols + encoded_cols]
+
+    pred = model.predict(X_input)[0]
+    prob = model.predict_proba(X_input)[0][list(model.classes_).index(pred)]
+
+    return pred, prob
+
+print(predict_input(new_input))
 
