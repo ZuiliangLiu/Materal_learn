@@ -234,13 +234,13 @@ def max_depth_error(md):
 # plt.tight_layout()
 # plt.show()
 
-# # 创建并训练基准模型
-# base_model = RandomForestClassifier(random_state=42,n_jobs=-1).fit(X_train, train_targets)
-# # 计算训练集、验证集准确率
-# base_train_acc = base_model.score(X_train, train_targets)
-# base_val_acc = base_model.score(X_val, val_targets)
-#
-# base_accs = base_train_acc, base_val_acc
+# 创建并训练基准模型
+base_model = RandomForestClassifier(random_state=42,n_jobs=-1).fit(X_train, train_targets)
+# 计算训练集、验证集准确率
+base_train_acc = base_model.score(X_train, train_targets)
+base_val_acc = base_model.score(X_val, val_targets)
+
+base_accs = base_train_acc, base_val_acc
 
 # print(base_accs)
 
@@ -279,9 +279,27 @@ def max_depth_error(md):
 # plt.tight_layout()
 # plt.show()
 
+def test_params(**params):
+    model = RandomForestClassifier(
+        random_state=42,
+        n_jobs=-1,
+        **params
+    ).fit(X_train, train_targets)
 
+    return (model.score(X_train, train_targets),model.score(X_val, val_targets))
+#
+#
+# print(test_params(max_depth=5))
+# # print( test_params(max_depth=26))
+#
+# print( test_params(max_leaf_nodes=2**5))
+# # print(test_params(max_leaf_nodes=2**20))
+#
+print(base_accs)
 
-
+print("max_features='log2'：", test_params(max_features='log2'))
+print("max_features=3：", test_params(max_features=3))
+print("max_features=20：", test_params(max_features=6))
 
 
 
