@@ -8,9 +8,11 @@ warnings.filterwarnings("ignore",category=pd.errors.PerformanceWarning)
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder, OneHotEncoder
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier,StackingClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.tree import plot_tree, export_text
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
 
 
 pd.set_option('display.max_columns', None)
@@ -82,14 +84,14 @@ train_preds = model.predict(X_train)
 # print("训练集准确率：", accuracy_score(train_targets, train_preds))
 # print(confusion_matrix(train_targets, train_preds))
 # print(model.score(X_train, train_targets))
-
+#
 # print(model.score(X_val, val_targets))
 
 # plt.figure(figsize=(20, 10))
-# plot_tree(model,feature_names=X_train.columns,max_depth=2,filled=True,fontsize=10)
+# plot_tree(model,feature_names=X_train.columns,max_depth=10,filled=True,fontsize=10)
 # plt.tight_layout()
 # plt.show()
-
+#
 # print(model.tree_.max_depth)
 
 # tree_text = export_text(model,max_depth=10,feature_names=list(X_train.columns))
@@ -201,9 +203,9 @@ def max_depth_error(md):
 #     n_jobs=-1,
 #     random_state=42
 # )
-# 
+#
 # model.fit(X_train, train_targets)
-
+#
 # print("训练集准确率：", model.score(X_train, train_targets))
 # print("验证集准确率：", model.score(X_val, val_targets))
 
@@ -243,7 +245,7 @@ base_val_acc = base_model.score(X_val, val_targets)
 base_accs = base_train_acc, base_val_acc
 
 # print(base_accs)
-
+#
 # model_1 = RandomForestClassifier(random_state=42,n_jobs=-1,n_estimators=10)
 # model_1.fit(X_train, train_targets)
 #
@@ -287,30 +289,170 @@ def test_params(**params):
     ).fit(X_train, train_targets)
 
     return (model.score(X_train, train_targets),model.score(X_val, val_targets))
-#
+
+
+# print("基准模型（训练集、验证集）：", base_accs)
 #
 # print(test_params(max_depth=5))
-# # print( test_params(max_depth=26))
+# print( test_params(max_depth=26))
 #
 # print( test_params(max_leaf_nodes=2**5))
-# # print(test_params(max_leaf_nodes=2**20))
+# print(test_params(max_leaf_nodes=2**20))
 #
-print(base_accs)
+#
+# print("max_features='log2'：", test_params(max_features='log2'))
+# print("max_features=3：", test_params(max_features=3))
+# print("max_features=20：", test_params(max_features=6))
+#
+# print(test_params(min_samples_split=3, min_samples_leaf=2))#节点分裂所需的最少样本数、叶节点的最少样本数
+#
+# print(test_params(min_samples_split=100, min_samples_leaf=60))
+#
+# # 较宽松的分裂条件
+# print(test_params(min_impurity_decrease=1e-7))
+# # 较严格的分裂条件
+# print(test_params(min_impurity_decrease=1e-2))
+#
+# print(test_params(bootstrap=False))#是否有放回
+#
+# print(test_params(max_samples=0.9))#抽取多少样本进行训练
+#
+# print(test_params(class_weight='balanced'))# 根据类别数量自动设置权重
+#
+# print(test_params(class_weight={'No': 1, 'Yes': 2}))# 手动设置类别权重
 
-print("max_features='log2'：", test_params(max_features='log2'))
-print("max_features=3：", test_params(max_features=3))
-print("max_features=20：", test_params(max_features=6))
+# model_1 = RandomForestClassifier(
+#     n_jobs=-1,
+#     random_state=42,
+#     n_estimators=500,
+#     max_features=7,
+#     max_depth=30,
+#     class_weight={'No': 1, 'Yes': 1.5}
+# )
+#
+# model_1.fit(X_train, train_targets)
+#
+# print("训练集准确率：", model_1.score(X_train, train_targets))
+# print("验证集准确率：", model_1.score(X_val, val_targets))
 
+# param_grid = {
+#     "max_depth": [10, 20, 30],
+#     "max_features": [3, 7]
+# }
+#
+# # 2. 设置分层3折交叉验证
+# # 尽量让每一折的 No/Yes 比例接近整个训练集
+# cv = StratifiedKFold(
+#     n_splits=3,
+#     shuffle=True,
+#     random_state=42
+# )
+#
+# # 3. 创建随机森林
+# # 搜索时先使用100棵树，减少训练工作量
+# rf = RandomForestClassifier(
+#     n_estimators=100,
+#     random_state=42,
+#     n_jobs=-1,
+#     class_weight={"No": 1, "Yes": 1.5}
+# )
+#
+# # 4. 创建网格搜索器
+# grid_search = GridSearchCV(
+#     estimator=rf,
+#     param_grid=param_grid,
+#     scoring="accuracy",
+#     cv=cv,
+#     n_jobs=1,                  # 逐个执行任务，森林内部使用多核
+#     refit=True,                # 用最佳参数重新训练完整训练集
+#     return_train_score=True,   # 保存各折的训练集分数
+#     verbose=2,                 # 显示每次训练完成的信息和耗时
+#     error_score="raise"        # 出错时直接显示原因
+# )
+#
+# # 5. 只使用训练集进行参数搜索
+# grid_search.fit(X_train, train_targets)
+#
+# # 6. 查看搜索结果
+# print("最佳参数：", grid_search.best_params_)
+# print("最佳平均交叉验证准确率：", grid_search.best_score_)
+#
+# # 最佳模型已经训练完成，可以直接使用
+# model_grid = grid_search.best_estimator_
+#
+# print("完整训练集准确率：",
+#       model_grid.score(X_train, train_targets))
+#
+# print("原验证集准确率：",
+#       model_grid.score(X_val, val_targets))
+#
+# # 7. 查看每组参数的表现
+# results_df = pd.DataFrame(grid_search.cv_results_)
+#
+# results_df = results_df[
+#     [
+#         "param_max_depth",
+#         "param_max_features",
+#         "mean_train_score",
+#         "mean_test_score",
+#         "std_test_score"
+#     ]
+# ].sort_values("mean_test_score", ascending=False)
+#
+# print(results_df.to_string(index=False))
 
+# 1. 创建第一层的三个模型
+lr_model = LogisticRegression(
+    max_iter=1000,
+    random_state=42
+)
 
+dt_model = DecisionTreeClassifier(
+    max_depth=10,
+    random_state=42
+)
 
+rf_model = RandomForestClassifier(
+    n_estimators=100,
+    max_features=7,
+    max_depth=30,
+    random_state=42,
+    n_jobs=-1,
+    # Stacking内部将No编码为0，Yes编码为1
+    class_weight={0: 1, 1: 1.5}
+)
 
+# 2. 创建Stacking模型
+stack_model = StackingClassifier(
+    estimators=[
+        ("lr", lr_model),
+        ("dt", dt_model),
+        ("rf", rf_model)
+    ],
+    # 第二层：学习如何组合第一层的预测
+    final_estimator=LogisticRegression(
+        max_iter=1000,
+        random_state=42
+    ),
+    cv=3,
+    stack_method="predict_proba",
+    passthrough=False,
+    n_jobs=1
+)
 
+# 3. 训练整个Stacking模型
+# 不需要提前分别训练上面的三个模型
+print("开始训练Stacking模型……")
+stack_model.fit(X_train, train_targets)
+print("训练完成")
 
+# 4. 评估模型
+print("Stacking训练集准确率：",
+      stack_model.score(X_train, train_targets))
 
+print("Stacking验证集准确率：",
+      stack_model.score(X_val, val_targets))
 
-
-
-
-
-
+# 5. 查看前10个验证样本的预测
+print("前10个预测结果：",
+      stack_model.predict(X_val[:10]))
