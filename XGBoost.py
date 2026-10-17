@@ -10,6 +10,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import root_mean_squared_error
 from sklearn.model_selection import KFold
+from sklearn.model_selection import train_test_split
 
 
 
@@ -175,7 +176,7 @@ preds = model.predict(X)
 def rmse(a, b):
     return root_mean_squared_error(a, b)
 
-print(rmse(targets, preds))
+# print(rmse(targets, preds))
 
 # # 线性回归：训练、预测、计算RMSE
 # linear_model = LinearRegression()
@@ -200,6 +201,8 @@ print(rmse(targets, preds))
 # forest_rmse = root_mean_squared_error(targets, forest_preds)
 #
 # print(f"随机森林训练集 RMSE：{forest_rmse:.2f}")
+
+kfold = KFold(n_splits=5)
 
 def train_and_evaluate(
     X_train, train_targets,
@@ -228,3 +231,155 @@ def train_and_evaluate(
     )
 
     return model, train_rmse, val_rmse
+
+models = []
+
+for train_idxs, val_idxs in kfold.split(X):
+    X_train, train_targets = X.iloc[train_idxs], targets.iloc[train_idxs]
+
+    X_val, val_targets = X.iloc[val_idxs], targets.iloc[val_idxs]
+
+    model, train_rmse, val_rmse = train_and_evaluate(
+        X_train,
+        train_targets,
+        X_val,
+        val_targets,
+        max_depth=4,
+        n_estimators=20
+    )
+
+    models.append(model)
+
+    # print(
+    #     'Train RMSE: {}, Validation RMSE: {}'
+    #     .format(train_rmse, val_rmse)
+    # )
+
+def predict_avg(models, inputs):
+    return np.mean(
+        [model.predict(inputs) for model in models],
+        axis=0
+    )
+
+def calculate_rmse(targets, predictions):
+    return np.sqrt(
+        np.mean((np.array(targets) - np.array(predictions)) ** 2)
+    )
+
+# average_loss = calculate_rmse(targets, preds)
+#
+# preds = predict_avg(models, X)
+#
+# print(preds)
+#
+# print(f"Average RMSE: {average_loss:.4f}")
+
+X_train, X_val, train_targets, val_targets = train_test_split(
+    X,
+    targets,
+    test_size=0.1,
+    random_state=42
+)
+
+
+def test_params(**params):
+    model = XGBRegressor(
+        n_jobs=-1,
+        random_state=42,
+        **params
+    )
+
+    model.fit(X_train, train_targets)
+
+    train_predictions = model.predict(X_train)
+    val_predictions = model.predict(X_val)
+
+    train_rmse = rmse(train_predictions, train_targets)
+    val_rmse = rmse(val_predictions, val_targets)
+
+    print(
+        "Train RMSE: {}, Validation RMSE: {}"
+        .format(train_rmse, val_rmse)
+    )
+
+    return model, train_rmse, val_rmse
+
+# test_params(n_estimators=10)
+#
+# test_params(n_estimators=30)
+#
+# test_params(n_estimators=100)
+#
+# test_params(n_estimators=240)
+
+# test_params(max_depth=2,n_estimators=10)
+#
+# test_params(max_depth=5,n_estimators=10)
+#
+# test_params(max_depth=10,n_estimators=10)
+
+# test_params(
+#     n_estimators=50,
+#     learning_rate=0.01
+# )
+#
+# test_params(
+#     n_estimators=50,
+#     learning_rate=0.1
+# )
+#
+# test_params(
+#     n_estimators=50,
+#     learning_rate=0.3
+# )
+#
+# test_params(
+#     n_estimators=50,
+#     learning_rate=0.9
+# )
+#
+# test_params(
+#     n_estimators=50,
+#     learning_rate=0.99
+# )
+
+model = XGBRegressor(
+    n_jobs=-1,
+    random_state=42,
+    n_estimators=1000,
+    learning_rate=0.2,
+    max_depth=10,
+    subsample=0.9,
+    colsample_bytree=0.7
+)
+
+model.fit(X, targets)
+
+# preds = model.predict(X)
+#
+# print(rmse(targets, preds))
+
+test_preds = model.predict(X_test)
+submission_df["Sales"] = test_preds
+# print(submission_df.head())
+
+missing_open = test_df["Open"].isna().sum()
+
+print(f"Open列缺失值数量：{missing_open}")
+
+# 如果缺失值按营业处理，填充为1
+test_df["Open"] = test_df["Open"].fillna(1)
+
+submission_df["Sales"] = (
+    submission_df["Sales"] * test_df["Open"]
+)
+
+print(submission_df.sample(20))
+
+submission_df.to_csv(
+    "submission.csv",
+    index=False
+)
+
+
+
